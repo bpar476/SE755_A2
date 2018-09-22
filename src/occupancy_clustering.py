@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.cluster import KMeans
+from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import Imputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -53,10 +54,28 @@ X_train, X_test, y_train, y_test = train_test_split(processed_features, target, 
 
 kmeans = KMeans(n_clusters=2, random_state=0)
 train_cluster_labels = kmeans.fit_predict(X_train)
-
 pred_labels = kmeans.predict(X_test)
 
 # Explained variance score: 1 is perfect prediction
+print('###### K-MEANS MODEL #######')
+print('adjusted rand index for testing data: %.2f' % adjusted_rand_score(y_test, pred_labels))
+print('******************************************************* ')
+print('adjusted rand index for training data: %.2f' % adjusted_rand_score(y_train, train_cluster_labels))
+print('******************************************************* ')
+
+print('purity for testing data: %.2f' % purity(y_test, pred_labels))
+print('******************************************************* ')
+print('purity for training data: %.2f' % purity(y_train, train_cluster_labels))
+print('******************************************************* ')
+
+gmm = GaussianMixture(n_components=2, random_state=0)
+gmm.fit(X_train)
+
+train_cluster_labels = gmm.predict(X_train)
+pred_labels = gmm.predict(X_test)
+
+# Explained variance score: 1 is perfect prediction
+print('###### GAUSSIAN MIXTURE MODEL #######')
 print('adjusted rand index for testing data: %.2f' % adjusted_rand_score(y_test, pred_labels))
 print('******************************************************* ')
 print('adjusted rand index for training data: %.2f' % adjusted_rand_score(y_train, train_cluster_labels))
