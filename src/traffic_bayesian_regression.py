@@ -23,6 +23,8 @@ parsed_args = parser.parse_args()
 
 MODEL_LOCATION = './model/traffic_model'
 RESULTS_LOCATION = './results/traffic_results.csv'
+PERFORMANCE_LOCATION = './performance/traffic_performance.csv'
+
 target_label='Segment23_(t+1)'
 
 def train(save=True):
@@ -66,7 +68,7 @@ def train(save=True):
 
     return tuned_model, untuned_model, X_test, y_test
 
-def test(test_file):
+def test_extern(test_file):
     model = joblib.load(MODEL_LOCATION)
 
     test_data = read_csv(test_file)
@@ -85,20 +87,10 @@ def test(test_file):
     with open(RESULTS_LOCATION, 'w') as outfile:
         prediction.to_csv(path_or_buf=outfile, index=false)
 
-def performance():
-    mse_untuned = []
-    mse_tuned = []
-    r2_untuned = []
-    r2_tuned = []
-
-    for x in range(10):
-        tuned_model, untuned_model, X_test, y_test = train(False)
-
-
-# END TRAIN
+def test():
+    tuned_model, untuned_model, X_test, y_test = train()
 
     y_pred = tuned_model.predict(X_test)
-    y_train_pred = tuned_model.predict(X_train)
 
     print('_____________________TUNED MODEL_____________________ ')
     # The coefficients
@@ -110,13 +102,8 @@ def performance():
     # Explained variance score: 1 is perfect prediction
     print('Variance score for testing data: %.2f' % r2_score(y_test, y_pred))
     print('******************************************************* ')
-    print("Mean squared error for training data: %.2f"
-          % mean_squared_error(y_train, y_train_pred))
-    # Explained variance score: 1 is perfect prediction
-    print('Variance score for training data: %.2f' % r2_score(y_train, y_train_pred))
 
     y_pred = untuned_model.predict(X_test)
-    y_train_pred = untuned_model.predict(X_train)
 
     print('_____________________UNTUNED MODEL_____________________ ')
     # The coefficients
@@ -128,7 +115,34 @@ def performance():
     # Explained variance score: 1 is perfect prediction
     print('Variance score for testing data: %.2f' % r2_score(y_test, y_pred))
     print('******************************************************* ')
-    print("Mean squared error for training data: %.2f"
-          % mean_squared_error(y_train, y_train_pred))
-    # Explained variance score: 1 is perfect prediction
-    print('Variance score for training data: %.2f' % r2_score(y_train, y_train_pred))
+
+
+def performance():
+    mse_untuned = []
+    mse_tuned = []
+    r2_untuned = []
+    r2_tuned = []
+
+    for x in range(10):
+        tuned_model, untuned_model, X_test, y_test = train(False)
+
+        untuned_prediction = untuned_model.predict(X_test)
+        tuned_prediction = tuned_model.predict(X_test)
+
+        mse_untuned.append(mean_squared_error(untuned_prediction, y_test))
+        mse_tuned.append(mean_squared_error(tuned_prediction, y_test))
+
+        r2_untuned.append(r2_score(untuned_prediction, y_test))
+        r2_tuned.append(r2_score(tuned_prediction, y_test))
+
+    with open(PERFORMANCE_LOCATION, 'w') as outfile:
+        for x in range(10):
+            outfile.write("Iteration {}\n".format(x +1))
+            outfile.write("--Mean Squared Error--\n")
+            outfile.write("\tUntuned model: {}\n".format(mse_untuned[x]))
+            outfile.write("\tTuned model: {}\n".format(mse_tuned[x]))
+            outfile.write("--R2 score--\n")
+            outfile.write("\tUntuned model: {}\n".format(r2_untuned[x]))
+            outfile.write("\tTuned model: {}\n".format(r2_tuned[x]))
+            outfile.write("\n")
+

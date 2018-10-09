@@ -16,6 +16,7 @@ Inputs: none
 Outputs
     - Print accuracy/error/variance to console as usual
     - File with untuned and tuned performance scores (score measures TBC)
+    - Performance results in `/performance` dir
 
 
 
