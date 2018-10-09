@@ -25,6 +25,7 @@ parsed_args = parser.parse_args()
 MODEL_LOCATION = '../model/landsat_logistic_model'
 RESULTS_LOCATION = '../results/traffic_results.csv'
 PERFORMANCE_LOCATION = '../performance/landsat_logistic_regression.csv'
+CV_LOCATION = '../cv_results/landsat_logistic_cv.csv'
 target_col = 36
 
 def train(save=True):
@@ -59,8 +60,13 @@ def train(save=True):
     grid_search.fit(X_train, y_train)
     
     cv_results_ = grid_search.cv_results_
+    cvs = pd.DataFrame(cv_results_)
     best_params_ = grid_search.best_params_
     print(best_params_)
+    
+    with open(CV_LOCATION, 'w') as outfile:
+        cvs.to_csv(path_or_buf=outfile, index=False)
+        
     tuned_model = grid_search.best_estimator_
     
     untuned_model = LogisticRegression()
@@ -138,22 +144,15 @@ def performance():
     untuned_results = pd.DataFrame([[model_name, 'Untuned', acc_untuned_av.iloc[0], precision_untuned_av.iloc[0]]], columns=headers)
     tuned_results = pd.DataFrame([[model_name, 'Tuned', acc_tuned_av.iloc[0], precision_tuned_av.iloc[0]]], columns=headers)
     
-    # remove existing performance data
-    if os.path.isfile(PERFORMANCE_LOCATION):
-        results = pd.read_csv(PERFORMANCE_LOCATION)
-        results = results[(results['Model'] != model_name)]
-    else:
-        results = pd.DataFrame(columns=headers)
+    results = pd.DataFrame(columns=headers)
         
     results = results.append(untuned_results)
     results = results.append(tuned_results)
     results.to_csv(path_or_buf=PERFORMANCE_LOCATION, index=False)
 
-#train()
+train()
 #test('../datasets/landsat.csv')
 #performance()
-
-
 
 
 
