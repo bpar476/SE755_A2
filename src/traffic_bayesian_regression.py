@@ -90,11 +90,13 @@ def train(save=True):
 def test_extern(test_file):
     print("Loading model from {}/{}".format(MODEL_DIR, MODEL_NAME))
     model = joblib.load(os.path.join(MODEL_DIR, MODEL_NAME))
-
     print("Loading test data from {}".format(test_file))
-    test_data = read_csv(test_file)
+    test_data = pd.read_csv(test_file)
 
-    features = test_data.drop([target_label], axis=1, inplace=False)
+    features = test_data
+    if target_label in test_data.columns:
+        print("dropping target label for tests")
+        features = test_data.drop([target_label], axis=1, inplace=False)
 
     full_pipeline = Pipeline([
             ('imputer', Imputer(strategy="median")),
@@ -108,7 +110,7 @@ def test_extern(test_file):
 
     with open(os.path.join(RESULTS_DIR,RESULTS_NAME), 'w') as outfile:
         print("Printing prediction results in {}".format(outfile.name))
-        prediction.to_csv(path_or_buf=outfile, index=false)
+        prediction.to_csv(path_or_buf=outfile, index=False)
 
 def test_dev():
     tuned_model, untuned_model, X_test, y_test = train()
@@ -184,7 +186,7 @@ if __name__ == "__main__":
         performance()
     elif parsed_args.test_file != None:
         print("Testing with external data from {}".format(parsed_args.test_file))
-        test_extern(parsed_args.test_file)
+        test_extern(parsed_args.test_file[0])
     elif parsed_args.test_dev:
         print("Running development test")
         test_dev()
