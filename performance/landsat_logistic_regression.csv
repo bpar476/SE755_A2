@@ -1,0 +1,3 @@
+Model,Model Tuning,Accuracy (%),Precision (%)
+logistic_regression,Untuned,81.33333333333333,76.6033305952756
+logistic_regression,Tuned,81.41666666666667,76.27955122010893
