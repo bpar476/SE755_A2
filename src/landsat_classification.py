@@ -11,7 +11,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import StratifiedShuffleSplit, GridSearchCV
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, precision_score
+from sklearn.metrics import accuracy_score, f1_score
 from sklearn.externals import joblib
 
 # Argument processing
@@ -122,29 +122,29 @@ def test_dev():
     print("Making test predictions")
     T_untuned = untuned_model.predict(X_test)
     acc_untuned = (100*accuracy_score(y_test, T_untuned))
-    precision_untuned = (100*precision_score(y_test, T_untuned, average='weighted', labels=pd.unique(pd.unique(y_test))))
+    f1_untuned = (f1_score(y_test, T_untuned, average='weighted', labels=pd.unique(pd.unique(y_test))))
     
     #tuned score
     T_tuned = tuned_model.predict(X_test)
     acc_tuned = (100*accuracy_score(y_test, T_tuned))
-    precision_tuned = (100*precision_score(y_test, T_tuned,average='weighted', labels=pd.unique(pd.unique(y_test))))
+    f1_tuned = (f1_score(y_test, T_tuned,average='weighted', labels=pd.unique(pd.unique(y_test))))
     
     print(acc_untuned)
     print('*******************************************************************')
     print("The prediction accuracy (untuned) for all testing instances is : {:.2f}%.".format(acc_untuned))
-    print("The precision accuracy (untuned) for all testing instances is : {:.2f}%.".format(precision_untuned))
+    print("The f1 score (untuned) for all testing instances is : {:.2f}.".format(f1_untuned))
     
 
     print('*******************************************************************')
     print("The prediction accuracy (tuned) for all testing instances is : {:.2f}%.".format(acc_tuned))
-    print("The prediction precision (tuned) for all testing instances is : {:.2f}%.".format(precision_tuned))
+    print("The f1 score (tuned) for all testing instances is : {:.2f}.".format(f1_tuned))
         
 def performance():
     num_trials = 1
     acc_untuned = []
     acc_tuned = []
-    precision_untuned = []
-    precision_tuned = []
+    f1_untuned = []
+    f1_tuned = []
     
     # calculate performance over several trials
     for x in range(0, num_trials):
@@ -154,12 +154,12 @@ def performance():
         #untuned score
         T_untuned = untuned_model.predict(X_test)
         acc_untuned.append(100*accuracy_score(y_test, T_untuned))
-        precision_untuned.append(100*precision_score(y_test, T_untuned, average='weighted', labels=pd.unique(pd.unique(y_test))))
+        f1_untuned.append(f1_score(y_test, T_untuned, average='weighted', labels=pd.unique(pd.unique(y_test))))
         
         #tuned score
         T_tuned = tuned_model.predict(X_test)
         acc_tuned.append(100*accuracy_score(y_test, T_tuned))
-        precision_tuned.append(100*precision_score(y_test, T_tuned,average='weighted', labels=pd.unique(pd.unique(y_test))))
+        f1_tuned.append(f1_score(y_test, T_tuned,average='weighted', labels=pd.unique(pd.unique(y_test))))
     
         
     #print(classification_report(self.y_test_matrix, T_tuned, target_names=pd.unique(pd.unique(self.target))))
@@ -168,25 +168,26 @@ def performance():
     
     # Take mean of all the trials
     acc_untuned_av = pd.DataFrame(acc_untuned).mean()
-    precision_untuned_av =  pd.DataFrame(precision_untuned).mean()
+    f1_untuned_av =  pd.DataFrame(f1_untuned).mean()
     
     acc_tuned_av = pd.DataFrame(acc_tuned).mean()
-    precision_tuned_av =  pd.DataFrame(precision_tuned).mean()
+    f1_tuned_av =  pd.DataFrame(f1_tuned).mean()
     
     print(acc_untuned)
     print('({:d} trials)'.format(num_trials))
     print('*******************************************************************')
     print("The average prediction accuracy (untuned) for all testing instances is : {:.2f}%.".format(acc_untuned_av.iloc[0]))
-    
+    print("The average f1 score (untuned) for all testing instances is : {:.2f}.".format(f1_untuned_av.iloc[0]))
 
     print('*******************************************************************')
     print("The average prediction accuracy (tuned) for all testing instances is : {:.2f}%.".format(acc_tuned_av.iloc[0]))
+    print("The average f1 score (tuned) for all testing instances is : {:.2f}.".format(f1_tuned_av.iloc[0]))
     
     ## Print all this stuff to a file
-    headers = ['Model', 'Model Tuning', 'Accuracy (%)', 'Precision (%)']
+    headers = ['Model', 'Model Tuning', 'Accuracy (%)', 'f1 (%)']
     model_name = 'logistic_regression'
-    untuned_results = pd.DataFrame([[model_name, 'Untuned', acc_untuned_av.iloc[0], precision_untuned_av.iloc[0]]], columns=headers)
-    tuned_results = pd.DataFrame([[model_name, 'Tuned', acc_tuned_av.iloc[0], precision_tuned_av.iloc[0]]], columns=headers)
+    untuned_results = pd.DataFrame([[model_name, 'Untuned', acc_untuned_av.iloc[0], f1_untuned_av.iloc[0]]], columns=headers)
+    tuned_results = pd.DataFrame([[model_name, 'Tuned', acc_tuned_av.iloc[0], f1_tuned_av.iloc[0]]], columns=headers)
     
     results = pd.DataFrame(columns=headers)
         
@@ -210,7 +211,6 @@ if __name__ == "__main__":
         test_dev()
     else:
         parser.print_help()
-
 
 
     
