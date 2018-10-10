@@ -132,6 +132,7 @@ def test_extern(test_file):
     prediction = pd.DataFrame(data=data.transpose(), columns=['K-Mean Prediction', 'GMM Prediction'])
 
     with open(os.path.join(RESULTS_DIR,RESULTS_NAME), 'w') as outfile:
+        print("Outputting results to {}".format(outfile.name))
         prediction.to_csv(path_or_buf=outfile, index=False)
 
 def test_dev():
@@ -210,4 +211,21 @@ def performance():
 
         print("Writing results to {}".format(outfile.name))
         results.to_csv(path_or_buf=outfile, index=False)
+
+if __name__ == "__main__":
+    parsed_args = parser.parse_args()
+    if parsed_args.re_train:
+        print("Re-training model")
+        train()
+    elif parsed_args.analysis:
+        print("Doing performance analysis")
+        performance()
+    elif parsed_args.test_file != None:
+        print("Testing with external data from {}".format(parsed_args.test_file))
+        test_extern(parsed_args.test_file[0])
+    elif parsed_args.test_dev:
+        print("Running development test")
+        test_dev()
+    else:
+        parser.print_help()
 
