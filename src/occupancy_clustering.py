@@ -33,21 +33,18 @@ parser.add_argument('--test-dev', action='store_const', const=True, default=Fals
 parsed_args = parser.parse_args()
 
 MODEL_DIR = '../model'
-MODEL_NAME = 'occupancy_logistic_model'
+MODEL_NAME = 'occupancy_model'
 
 RESULTS_DIR = '../results'
 RESULTS_NAME = 'occupancy_results.csv'
 
 PERFORMANCE_DIR = '../performance'
-PERFORMANCE_NAME = 'occupancy_logistic_regression.csv'
-
-CV_RESULTS_DIR = '../cv_results'
-CV_RESULTS_NAME = 'occupancy_logistic_cv.csv'
+PERFORMANCE_NAME = 'occupancy.csv'
 
 KMEAN_PREFIX = 'kmean_'
 GMM_PREFIX = 'gmm_'
 
-for directory in [MODEL_DIR, RESULTS_DIR, PERFORMANCE_DIR, CV_RESULTS_DIR]:
+for directory in [MODEL_DIR, RESULTS_DIR, PERFORMANCE_DIR]:
     if not os.path.isdir(directory):
         print("Making directory: {}".format(directory))
         os.mkdir(directory)
