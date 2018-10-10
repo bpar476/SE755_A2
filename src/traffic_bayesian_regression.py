@@ -27,17 +27,17 @@ parser.add_argument('--test-dev', action='store_const', const=True, default=Fals
 
 parsed_args = parser.parse_args()
 
-MODEL_DIR = './model'
+MODEL_DIR = '../model'
 MODEL_NAME = 'traffic_model'
 
-RESULTS_DIR = './results'
+RESULTS_DIR = '../results'
 RESULTS_NAME = 'traffic_results.csv'
 
-PERFORMANCE_DIR = './performance'
+PERFORMANCE_DIR = '../performance'
 PERFORMANCE_NAME = 'traffic_performance.csv'
 
-CV_RESULTS_DIR = './cv_results'
-CV_RESULTS_NAME = 'regression_cv.csv'
+CV_RESULTS_DIR = '../cv_results'
+CV_RESULTS_NAME = 'traffic_regression_cv.csv'
 
 target_label='Segment23_(t+1)'
 
@@ -158,10 +158,11 @@ def performance():
     mse_tuned = []
     r2_untuned = []
     r2_tuned = []
+    num_trials = 10
 
     print("Running 10 train and evaluate iterations")
-    for x in range(10):
-        print("Iteration {} out of 10".format(x+1))
+    for x in range(num_trials):
+        print("Iteration {} out of {}".format(x+1, num_trials))
 
         tuned_model, untuned_model, X_test, y_test = train(False)
 
@@ -179,6 +180,21 @@ def performance():
 
     mse_tuned_av = pd.DataFrame(mse_tuned).mean()
     r2_tuned_av =  pd.DataFrame(r2_tuned).mean()
+    
+    print('_________________###################____________________')
+    print('({:d} trials)'.format(num_trials))
+    print("The average Mean squared error (Untuned) for testing data: %.2f"
+          % mse_untuned_av.iloc[0])
+    # Explained variance score: 1 is perfect prediction
+    print("The average variance (Untuned) for testing data: %.2f"
+          % r2_untuned_av.iloc[0])
+     
+    print("The average Mean squared error (Tuned) for testing data: %.2f"
+          % mse_tuned_av.iloc[0])
+    # Explained variance score: 1 is perfect prediction
+    print("The average variance (Tuned) for testing data: %.2f"
+          % r2_tuned_av.iloc[0])
+    print('******************************************************* ')
 
     with open(os.path.join(PERFORMANCE_DIR, PERFORMANCE_NAME), 'w') as outfile:
         headers = ['Model', 'Model Tuning', 'Mean Squared Error', 'R2 Score']
@@ -210,3 +226,4 @@ if __name__ == "__main__":
         test_dev()
     else:
         parser.print_help()
+        

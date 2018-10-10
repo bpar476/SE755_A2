@@ -1,0 +1,3 @@
+Model,Model Tuning,Mean Squared Error,R2 Score
+bayesian ridge regression,Untuned,1901.9486514603875,0.9533573193393419
+bayesian ridge regression,Tuned,1901.938691214145,0.9533573887970032
