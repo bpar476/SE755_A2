@@ -169,18 +169,18 @@ def performance():
         untuned_prediction = untuned_model.predict(X_test)
         tuned_prediction = tuned_model.predict(X_test)
 
-        mse_untuned.append(mean_squared_error(untuned_prediction, y_test))
-        mse_tuned.append(mean_squared_error(tuned_prediction, y_test))
+        mse_untuned.append(mean_squared_error(y_test, untuned_prediction))
+        mse_tuned.append(mean_squared_error(y_test, tuned_prediction))
 
-        r2_untuned.append(r2_score(untuned_prediction, y_test))
-        r2_tuned.append(r2_score(tuned_prediction, y_test))
+        r2_untuned.append(r2_score(y_test, untuned_prediction))
+        r2_tuned.append(r2_score(y_test, tuned_prediction))
 
     mse_untuned_av = pd.DataFrame(mse_untuned).mean()
     r2_untuned_av =  pd.DataFrame(r2_untuned).mean()
 
     mse_tuned_av = pd.DataFrame(mse_tuned).mean()
     r2_tuned_av =  pd.DataFrame(r2_tuned).mean()
-    
+
     print('_________________###################____________________')
     print('({:d} trials)'.format(num_trials))
     print("The average Mean squared error (Untuned) for testing data: %.2f"
@@ -188,7 +188,7 @@ def performance():
     # Explained variance score: 1 is perfect prediction
     print("The average variance (Untuned) for testing data: %.2f"
           % r2_untuned_av.iloc[0])
-     
+
     print("The average Mean squared error (Tuned) for testing data: %.2f"
           % mse_tuned_av.iloc[0])
     # Explained variance score: 1 is perfect prediction
@@ -226,4 +226,4 @@ if __name__ == "__main__":
         test_dev()
     else:
         parser.print_help()
-        
+
