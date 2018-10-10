@@ -15,7 +15,7 @@ from sklearn.metrics import accuracy_score, precision_score
 from sklearn.externals import joblib
 
 # Argument processing
-parser = argparse.ArgumentParser(description='Machine learning algorithm for traffic data. Options are available for re-training the model, testing the model with external data or running performance analysis. Note that only one option should be supplied at a time e.g. you should not run the script with both --test and --re-train.')
+parser = argparse.ArgumentParser(description='Machine learning algorithm for landsat data. Options are available for re-training the model, testing the model with external data or running performance analysis. Note that only one option should be supplied at a time e.g. you should not run the script with both --test and --re-train.')
 
 parser.add_argument('--test', metavar='TEST_FILE', nargs=1, dest='test_file', help='path to additional features to test against. Path must be relative to the current directory. If supplied, results of predictions against this test data will be the last thing printed by this script (optional)')
 
@@ -31,7 +31,7 @@ MODEL_DIR = '../model'
 MODEL_NAME = 'landsat_logistic_model'
 
 RESULTS_DIR = '../results'
-RESULTS_NAME = 'landsat_results.csv'
+RESULTS_NAME = 'landsat_logistic_results.csv'
 
 PERFORMANCE_DIR = '../performance'
 PERFORMANCE_NAME = 'landsat_logistic_regression.csv'
