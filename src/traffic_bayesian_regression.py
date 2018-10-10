@@ -34,11 +34,14 @@ RESULTS_DIR = './results'
 RESULTS_NAME = 'traffic_results.csv'
 
 PERFORMANCE_DIR = './performance'
-PERFORMANCE_NAME = 'traffic_performance.txt'
+PERFORMANCE_NAME = 'traffic_performance.csv'
+
+CV_RESULTS_DIR = './cv_results'
+CV_RESULTS_NAME = 'regression_cv.csv'
 
 target_label='Segment23_(t+1)'
 
-for directory in [MODEL_DIR, RESULTS_DIR, PERFORMANCE_DIR]:
+for directory in [MODEL_DIR, RESULTS_DIR, PERFORMANCE_DIR, CV_RESULTS_DIR]:
     if not os.path.isdir(directory):
         print("Making directory: {}".format(directory))
         os.mkdir(directory)
@@ -75,7 +78,14 @@ def train(save=True):
     grid_search.fit(X_train, y_train)
 
     cv_results_ = grid_search.cv_results_
+    cv_df = pd.DataFrame(cv_results_)
+
+    with open(os.path.join(CV_RESULTS_DIR, CV_RESULTS_NAME), 'w') as outfile:
+        cv_df.to_csv(path_or_buf=outfile, index=False)
+
     best_params_ = grid_search.best_params_
+    print("Best params: {}".format(best_params_))
+
     tuned_model = grid_search.best_estimator_
 
     untuned_model = BayesianRidge()
@@ -164,17 +174,25 @@ def performance():
         r2_untuned.append(r2_score(untuned_prediction, y_test))
         r2_tuned.append(r2_score(tuned_prediction, y_test))
 
+    mse_untuned_av = pd.DataFrame(mse_untuned).mean()
+    r2_untuned_av =  pd.DataFrame(r2_untuned).mean()
+
+    mse_tuned_av = pd.DataFrame(mse_tuned).mean()
+    r2_tuned_av =  pd.DataFrame(r2_tuned).mean()
+
     with open(os.path.join(PERFORMANCE_DIR, PERFORMANCE_NAME), 'w') as outfile:
+        headers = ['Model', 'Model Tuning', 'Mean Squared Error', 'R2 Score']
+        model_name = 'bayesian ridge regression'
+        untuned_results = pd.DataFrame([[model_name, 'Untuned', mse_untuned_av.iloc[0], r2_untuned_av.iloc[0]]], columns=headers)
+        tuned_results = pd.DataFrame([[model_name, 'Tuned', mse_tuned_av.iloc[0], r2_tuned_av.iloc[0]]], columns=headers)
+
+        results = pd.DataFrame(columns=headers)
+
+        results = results.append(untuned_results)
+        results = results.append(tuned_results)
+
         print("Writing results to {}".format(outfile.name))
-        for x in range(10):
-            outfile.write("Iteration {}\n".format(x +1))
-            outfile.write("--Mean Squared Error--\n")
-            outfile.write("\tUntuned model: {}\n".format(mse_untuned[x]))
-            outfile.write("\tTuned model: {}\n".format(mse_tuned[x]))
-            outfile.write("--R2 score--\n")
-            outfile.write("\tUntuned model: {}\n".format(r2_untuned[x]))
-            outfile.write("\tTuned model: {}\n".format(r2_tuned[x]))
-            outfile.write("\n")
+        results.to_csv(path_or_buf=outfile, index=False)
 
 if __name__ == "__main__":
     parsed_args = parser.parse_args()
