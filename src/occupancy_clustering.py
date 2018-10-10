@@ -39,7 +39,7 @@ RESULTS_DIR = '../results'
 RESULTS_NAME = 'occupancy_results.csv'
 
 PERFORMANCE_DIR = '../performance'
-PERFORMANCE_NAME = 'occupancy.csv'
+PERFORMANCE_NAME = 'occupancy_both.csv'
 
 KMEAN_PREFIX = 'kmean_'
 GMM_PREFIX = 'gmm_'
@@ -132,36 +132,100 @@ def test_extern(test_file):
     prediction = pd.DataFrame(data=data.transpose(), columns=['K-Mean Prediction', 'GMM Prediction'])
 
     with open(os.path.join(RESULTS_DIR,RESULTS_NAME), 'w') as outfile:
+        print("Outputting results to {}".format(outfile.name))
         prediction.to_csv(path_or_buf=outfile, index=False)
 
-train()
-test_extern('../datasets/occupancy.csv')
+def test_dev():
+    kmeans, gmm, X_test, y_test = train()
 
-# pred_labels = kmeans.predict(X_test)
+    kmeans_pred = kmeans.predict(X_test)
 
-# # Explained variance score: 1 is perfect prediction
-# print('###### K-MEANS MODEL #######')
-# print('adjusted rand index for testing data: %.2f' % adjusted_rand_score(y_test, pred_labels))
-# print('******************************************************* ')
-# print('adjusted rand index for training data: %.2f' % adjusted_rand_score(y_train, train_cluster_labels))
-# print('******************************************************* ')
+    print('###### K-MEANS MODEL #######')
+    print('adjusted rand index for testing data: %.2f' % adjusted_rand_score(y_test, kmeans_pred))
+    print('******************************************************* ')
+    print('purity for testing data: %.2f' % purity(y_test, kmeans_pred))
+    print('******************************************************* ')
 
-# print('purity for testing data: %.2f' % purity(y_test, pred_labels))
-# print('******************************************************* ')
-# print('purity for training data: %.2f' % purity(y_train, train_cluster_labels))
-# print('******************************************************* ')
+    gmm_pred = gmm.predict(X_test)
 
-# train_cluster_labels = gmm.predict(X_train)
-# pred_labels = gmm.predict(X_test)
+    # Explained variance score: 1 is perfect prediction
+    print('###### GAUSSIAN MIXTURE MODEL #######')
+    print('adjusted rand index for testing data: %.2f' % adjusted_rand_score(y_test, gmm_pred))
+    print('******************************************************* ')
 
-# # Explained variance score: 1 is perfect prediction
-# print('###### GAUSSIAN MIXTURE MODEL #######')
-# print('adjusted rand index for testing data: %.2f' % adjusted_rand_score(y_test, pred_labels))
-# print('******************************************************* ')
-# print('adjusted rand index for training data: %.2f' % adjusted_rand_score(y_train, train_cluster_labels))
-# print('******************************************************* ')
+    print('purity for testing data: %.2f' % purity(y_test, gmm_pred))
+    print('******************************************************* ')
 
-# print('purity for testing data: %.2f' % purity(y_test, pred_labels))
-# print('******************************************************* ')
-# print('purity for training data: %.2f' % purity(y_train, train_cluster_labels))
-# print('******************************************************* ')
+def performance():
+    randind_kmean = []
+    purity_kmean = []
+    randind_gmm = []
+    purity_gmm = []
+
+    num_trials = 10
+
+    print("Running 10 train and evaluate iterations")
+    for x in range(num_trials):
+        print("Iteration {} out of {}".format(x+1, num_trials))
+
+        kmean, gmm, X_test, y_test = train(False)
+
+        kmean_pred = kmean.predict(X_test)
+        gmm_pred = gmm.predict(X_test)
+
+        randind_kmean.append(adjusted_rand_score(y_test, kmean_pred))
+        randind_gmm.append(adjusted_rand_score(y_test, gmm_pred))
+
+        purity_kmean.append(purity(y_test, kmean_pred))
+        purity_gmm.append(purity(y_test, gmm_pred))
+
+    randind_gmm_av = pd.DataFrame(randind_gmm).mean()
+    purity_gmm_av =  pd.DataFrame(purity_gmm).mean()
+
+    randind_kmean_av = pd.DataFrame(randind_kmean).mean()
+    purity_kmean_av =  pd.DataFrame(purity_kmean).mean()
+
+    print('({:d} trials)'.format(num_trials))
+    print('_________________K-Means Model____________________')
+    print("The average adjusted rand score for testing data: %.2f"
+          % randind_kmean_av.iloc[0])
+    print("The average purity for testing data: %.2f"
+          % purity_kmean_av.iloc[0])
+
+    print('_________________GMM Model____________________')
+    print("The average adjusted rand score for testing data: %.2f"
+          % randind_gmm_av.iloc[0])
+    print("The average purity for testing data: %.2f"
+          % purity_gmm_av.iloc[0])
+    print('******************************************************* ')
+
+    with open(os.path.join(PERFORMANCE_DIR, PERFORMANCE_NAME), 'w') as outfile:
+        headers = ['Model', 'Adjusted Rand Score', 'Purity']
+        kmean_results = pd.DataFrame([['K-Means', randind_kmean_av.iloc[0], purity_kmean_av.iloc[0]]], columns=headers)
+        gmm_results = pd.DataFrame([['Guassian Mixture', randind_gmm_av.iloc[0], purity_gmm_av.iloc[0]]], columns=headers)
+
+        results = pd.DataFrame(columns=headers)
+
+        results = results.append(kmean_results)
+        results = results.append(gmm_results)
+
+        print("Writing results to {}".format(outfile.name))
+        results.to_csv(path_or_buf=outfile, index=False)
+
+if __name__ == "__main__":
+    parsed_args = parser.parse_args()
+    if parsed_args.re_train:
+        print("Re-training model")
+        train()
+    elif parsed_args.analysis:
+        print("Doing performance analysis")
+        performance()
+    elif parsed_args.test_file != None:
+        print("Testing with external data from {}".format(parsed_args.test_file))
+        test_extern(parsed_args.test_file[0])
+    elif parsed_args.test_dev:
+        print("Running development test")
+        test_dev()
+    else:
+        parser.print_help()
+
