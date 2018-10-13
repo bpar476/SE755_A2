@@ -10,6 +10,7 @@ from sklearn.linear_model import BayesianRidge
 from sklearn.preprocessing import Imputer
 from sklearn.pipeline import Pipeline
 from sklearn.externals import joblib
+from sklearn.feature_selection import SelectKBest, f_regression
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import GridSearchCV, KFold
@@ -47,7 +48,7 @@ for directory in [MODEL_DIR, RESULTS_DIR, PERFORMANCE_DIR, CV_RESULTS_DIR]:
     if not os.path.isdir(directory):
         print("Making directory: {}".format(directory))
         os.mkdir(directory)
-        
+
 def preprocess(data):
     # With test extern can't guarantee target column will be present
     features = data
@@ -73,19 +74,26 @@ def train(save=True, split_data=None):
     else:
         X_train, X_test, y_train, y_test = split_data
 
+    cv_pipe = Pipeline([
+        ('feature_select', SelectKBest(f_regression)),
+        ('regression', BayesianRidge())
+    ])
+
     param_range = [ 10**x for x in range(-1, 0)]
+    feature_range = [100, 200, 300, 400, 'all']
+
     param_grid = [
-            {'alpha_1': param_range,
-             'alpha_2': param_range,
-             'lambda_1': param_range,
-             'lambda_2': param_range,
+             {'feature_select__k': feature_range,
+             'regression__alpha_1': param_range,
+             'regression__alpha_2': param_range,
+             'regression__lambda_1': param_range,
+             'regression__lambda_2': param_range
              },
     ]
 
     print("Doing cross-validation on BayesianRidge")
-    model = BayesianRidge()
     inner_cv = KFold(n_splits=3, shuffle=True, random_state=1)
-    grid_search = GridSearchCV(model, param_grid, cv=inner_cv, scoring='neg_mean_squared_error',verbose=2)
+    grid_search = GridSearchCV(cv_pipe, param_grid, cv=inner_cv, scoring='neg_mean_squared_error',verbose=1)
     grid_search.fit(X_train, y_train)
 
     cv_results_ = grid_search.cv_results_
@@ -113,7 +121,7 @@ def test_extern(test_file):
     model = joblib.load(os.path.join(MODEL_DIR, MODEL_NAME))
     print("Loading test data from {}".format(test_file))
     test_data = pd.read_csv(test_file)
-    
+
     #ignore return value y as it is not present for testing
     X, _ = preprocess(test_data)
 
@@ -130,9 +138,10 @@ def test_dev():
     print("Making test predictions")
     y_pred = tuned_model.predict(X_test)
 
+    regression_object = tuned_model.named_steps['regression']
     print('_____________________TUNED MODEL_____________________ ')
     # The coefficients
-    print('Coefficients and Intercept are: ', tuned_model.coef_,"   ", tuned_model.intercept_,' respectively')
+    print('Coefficients and Intercept are: ', regression_object.coef_,"   ", regression_object.intercept_,' respectively')
     # The mean squared error
     print('_________________###################____________________')
     print("Mean squared error for testing data: %.2f"
@@ -161,12 +170,12 @@ def performance():
     r2_untuned = []
     r2_tuned = []
     num_trials = 3
-    
+
     data = pd.read_csv(DATASET)
     X, y = preprocess(data)
     kf = KFold(n_splits=num_trials)
     kf.get_n_splits(X)
-    
+
     i = 1
     print("Running {} train and evaluate iterations".format(num_trials))
     for train_index, test_index in kf.split(X):
@@ -180,10 +189,10 @@ def performance():
 
         mse_untuned.append(mean_squared_error(y_test, untuned_prediction))
         mse_tuned.append(mean_squared_error(y_test, tuned_prediction))
-        
+
         r2_untuned.append(r2_score(y_test, untuned_prediction))
         r2_tuned.append(r2_score(y_test, tuned_prediction))
-        
+
         i += 1
 
     mse_untuned_av = pd.DataFrame(mse_untuned).mean()

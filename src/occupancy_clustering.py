@@ -14,6 +14,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import adjusted_rand_score, cluster
 from sklearn.externals import joblib
+from sklearn.decomposition import PCA
 
 import datetime
 import argparse
@@ -83,6 +84,7 @@ def preprocess(data):
     features = data.drop(cols_to_drop, axis=1, inplace=False)
 
     full_pipeline = Pipeline([
+            ('pca', PCA(n_components=2)),
             ('imputer', Imputer(strategy="median")),
             ('std_scaler', StandardScaler())
         ])
@@ -169,7 +171,7 @@ def performance():
     X, y = preprocess(data)
     kf = KFold(n_splits=num_trials)
     kf.get_n_splits(X)
-    
+
     i = 1
     print("Running {} train and evaluate iterations".format(num_trials))
     for train_index, test_index in kf.split(X):
@@ -186,7 +188,7 @@ def performance():
 
         purity_kmean.append(purity(y_test, kmean_pred))
         purity_gmm.append(purity(y_test, gmm_pred))
-        
+
         i += 1
 
     randind_gmm_av = pd.DataFrame(randind_gmm).mean()
