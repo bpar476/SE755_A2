@@ -50,6 +50,8 @@ for directory in [MODEL_DIR, RESULTS_DIR, PERFORMANCE_DIR, CV_RESULTS_DIR]:
         
 def preprocess(data):
     # With test extern can't guarantee target column will be present
+    features = data
+    y = None
     if target_label in data.columns:
         features = data.drop([target_label], axis=1, inplace=False)
         y = data[target_label]
@@ -64,10 +66,9 @@ def preprocess(data):
 
 def train(save=True, split_data=None):
     print("Training model")
-    data = pd.read_csv(DATASET)
-    X, y = preprocess(data)
-
     if split_data is None:
+        data = pd.read_csv(DATASET)
+        X, y = preprocess(data)
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=1)
     else:
         X_train, X_test, y_train, y_test = split_data

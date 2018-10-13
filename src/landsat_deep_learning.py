@@ -133,6 +133,7 @@ def test_extern(test_file):
     prediction = pd.DataFrame(data=model.predict(processed_features.values))
     
     with open(os.path.join(RESULTS_DIR,RESULTS_NAME), 'w') as outfile:
+        print("Printing prediction results in {}".format(outfile.name))
         prediction.to_csv(path_or_buf=outfile, index=False)
         
     print("Finished testing")
