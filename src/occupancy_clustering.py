@@ -6,7 +6,7 @@ This is a temporary script file.
 """
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import Imputer
@@ -32,6 +32,8 @@ parser.add_argument('--test-dev', action='store_const', const=True, default=Fals
 
 parsed_args = parser.parse_args()
 
+DATASET = '../datasets/occupancy.csv'
+
 MODEL_DIR = '../model'
 MODEL_NAME = 'occupancy_model'
 
@@ -54,7 +56,7 @@ def purity(y_true, y_pred):
     contingency_matrix = cluster.contingency_matrix(y_true, y_pred)
     return np.sum(np.amax(contingency_matrix, axis=0)) / np.sum(contingency_matrix)
 
-def process_data(data):
+def preprocess(data):
     target_col = 'Occupancy'
 
     day_of_month = list()
@@ -70,13 +72,13 @@ def process_data(data):
     data.loc[:, 'day_of_month'] = day_of_month
     data.loc[:, 'hour'] = hour
 
-    target = None
+    y = None
 
     if not target_col in data.columns:
         cols_to_drop = ['HumidityRatio', 'date']
     else:
         cols_to_drop = [target_col, 'HumidityRatio', 'date']
-        target = data[target_col]
+        y = data[target_col]
 
     features = data.drop(cols_to_drop, axis=1, inplace=False)
 
@@ -85,18 +87,18 @@ def process_data(data):
             ('std_scaler', StandardScaler())
         ])
 
-    processed_features = pd.DataFrame(data=full_pipeline.fit_transform(features))
+    X = pd.DataFrame(data=full_pipeline.fit_transform(features))
 
-    return processed_features, target
+    return X, y
 
 
-def train(save=True):
-    fileName = '../datasets/occupancy.csv'
-    data = pd.read_csv(fileName)
-
-    processed_features, target = process_data(data)
-
-    X_train, X_test, y_train, y_test = train_test_split(processed_features, target, test_size=0.1, random_state=1)
+def train(save=True, split_data=None):
+    if split_data is None:
+        data = pd.read_csv(DATASET)
+        X, y = preprocess(data)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=1)
+    else:
+        X_train, X_test, y_train, y_test = split_data
 
     kmeans = KMeans(n_clusters=2, random_state=0)
     train_cluster_labels = kmeans.fit_predict(X_train)
@@ -123,10 +125,10 @@ def test_extern(test_file):
     print("Loading test data from {}".format(test_file))
     test_data = pd.read_csv(test_file)
 
-    processed_features, _ = process_data(test_data)
+    X, _ = preprocess(test_data)
 
-    kmean_prediction = kmeans.predict(processed_features)
-    gmm_prediction = gmm.predict(processed_features)
+    kmean_prediction = kmeans.predict(X)
+    gmm_prediction = gmm.predict(X)
 
     data = np.array([kmean_prediction, gmm_prediction])
     prediction = pd.DataFrame(data=data.transpose(), columns=['K-Mean Prediction', 'GMM Prediction'])
@@ -161,14 +163,20 @@ def performance():
     purity_kmean = []
     randind_gmm = []
     purity_gmm = []
+    num_trials = 3
 
-    num_trials = 10
-
-    print("Running 10 train and evaluate iterations")
-    for x in range(num_trials):
-        print("Iteration {} out of {}".format(x+1, num_trials))
-
-        kmean, gmm, X_test, y_test = train(False)
+    data = pd.read_csv(DATASET)
+    X, y = preprocess(data)
+    kf = KFold(n_splits=num_trials)
+    kf.get_n_splits(X)
+    
+    i = 1
+    print("Running {} train and evaluate iterations".format(num_trials))
+    for train_index, test_index in kf.split(X):
+        print("Iteration {} out of {}".format(i, num_trials))
+        X_train, X_test, y_train, y_test = X.iloc[train_index], X.iloc[test_index], y.iloc[train_index], y.iloc[test_index]
+        split_data = [X_train, X_test, y_train, y_test]
+        kmean, gmm, X_test, y_test = train(False, split_data)
 
         kmean_pred = kmean.predict(X_test)
         gmm_pred = gmm.predict(X_test)
@@ -178,6 +186,8 @@ def performance():
 
         purity_kmean.append(purity(y_test, kmean_pred))
         purity_gmm.append(purity(y_test, gmm_pred))
+        
+        i += 1
 
     randind_gmm_av = pd.DataFrame(randind_gmm).mean()
     purity_gmm_av =  pd.DataFrame(purity_gmm).mean()
@@ -228,4 +238,3 @@ if __name__ == "__main__":
         test_dev()
     else:
         parser.print_help()
-
