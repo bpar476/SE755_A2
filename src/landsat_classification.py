@@ -93,7 +93,7 @@ def train(save=True, split_data=None):
                 {
                     'feature_select__k': DIMENSIONS_TEST,
                     'classify__penalty': ['l1', 'l2'],
-                    'classify__C': [ 2**x for x in range(-1,0) ]
+                    'classify__C': [ 2**x for x in range(-6,6) ]
                 }
             ]
 
@@ -234,8 +234,4 @@ if __name__ == "__main__":
         test_dev()
     else:
         parser.print_help()
-
-#train()
-performance()
-test_extern('../datasets/landsat.csv')
 
