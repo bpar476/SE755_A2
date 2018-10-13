@@ -115,8 +115,9 @@ def test_extern(test_file):
     test_data = pd.read_csv(test_file, header=None)
 
     # Preprocessing
-    columns_to_keep = [16, 17, 18, 19]
-    features = test_data.loc[:, columns_to_keep].copy()
+    last_feature = test_data.columns.get_loc(target_col)
+    features = test_data.iloc[:, :last_feature].copy()
+
     full_pipeline = Pipeline([
             ('imputer', Imputer(strategy="median")),
             ('std_scaler', StandardScaler())
