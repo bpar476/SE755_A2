@@ -27,6 +27,8 @@ parser.add_argument('--test-dev', action='store_const', const=True, default=Fals
 
 parsed_args = parser.parse_args()
 
+DATASET = '../datasets/traffic.csv'
+
 MODEL_DIR = '../model'
 MODEL_NAME = 'traffic_model'
 
@@ -45,24 +47,32 @@ for directory in [MODEL_DIR, RESULTS_DIR, PERFORMANCE_DIR, CV_RESULTS_DIR]:
     if not os.path.isdir(directory):
         print("Making directory: {}".format(directory))
         os.mkdir(directory)
-
-def train(save=True):
-    print("Training models")
-    fileName = '../datasets/traffic.csv'
-    data = pd.read_csv(fileName)
-    features = data.drop([target_label], axis=1, inplace=False)
-    target = data[target_label]
+        
+def preprocess(data):
+    # With test extern can't guarantee target column will be present
+    if target_label in data.columns:
+        features = data.drop([target_label], axis=1, inplace=False)
+        y = data[target_label]
 
     full_pipeline = Pipeline([
             ('imputer', Imputer(strategy="median")),
             ('std_scaler', StandardScaler())
         ])
 
-    processed_features = pd.DataFrame(data=full_pipeline.fit_transform(features))
+    X = pd.DataFrame(data=full_pipeline.fit_transform(features))
+    return X, y
 
-    X_train, X_test, y_train, y_test = train_test_split(processed_features, target, test_size=0.1, random_state=1)
+def train(save=True, split_data=None):
+    print("Training model")
+    data = pd.read_csv(DATASET)
+    X, y = preprocess(data)
 
-    param_range = [ 10**x for x in range(-2, 0)]
+    if split_data is None:
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=1)
+    else:
+        X_train, X_test, y_train, y_test = split_data
+
+    param_range = [ 10**x for x in range(-1, 0)]
     param_grid = [
             {'alpha_1': param_range,
              'alpha_2': param_range,
@@ -102,21 +112,12 @@ def test_extern(test_file):
     model = joblib.load(os.path.join(MODEL_DIR, MODEL_NAME))
     print("Loading test data from {}".format(test_file))
     test_data = pd.read_csv(test_file)
-
-    features = test_data
-    if target_label in test_data.columns:
-        print("dropping target label for tests")
-        features = test_data.drop([target_label], axis=1, inplace=False)
-
-    full_pipeline = Pipeline([
-            ('imputer', Imputer(strategy="median")),
-            ('std_scaler', StandardScaler())
-        ])
-
-    processed_features = pd.DataFrame(data=full_pipeline.fit_transform(features))
+    
+    #ignore return value y as it is not present for testing
+    X, _ = preprocess(test_data)
 
     print("Making predictions")
-    prediction = pd.DataFrame(data=model.predict(processed_features), columns=[target_label])
+    prediction = pd.DataFrame(data=model.predict(X), columns=[target_label])
 
     with open(os.path.join(RESULTS_DIR,RESULTS_NAME), 'w') as outfile:
         print("Printing prediction results in {}".format(outfile.name))
@@ -158,22 +159,31 @@ def performance():
     mse_tuned = []
     r2_untuned = []
     r2_tuned = []
-    num_trials = 10
-
-    print("Running 10 train and evaluate iterations")
-    for x in range(num_trials):
-        print("Iteration {} out of {}".format(x+1, num_trials))
-
-        tuned_model, untuned_model, X_test, y_test = train(False)
+    num_trials = 3
+    
+    data = pd.read_csv(DATASET)
+    X, y = preprocess(data)
+    kf = KFold(n_splits=num_trials)
+    kf.get_n_splits(X)
+    
+    i = 1
+    print("Running {} train and evaluate iterations".format(num_trials))
+    for train_index, test_index in kf.split(X):
+        print("Iteration {} out of {}".format(i, num_trials))
+        X_train, X_test, y_train, y_test = X.iloc[train_index], X.iloc[test_index], y.iloc[train_index], y.iloc[test_index]
+        split_data = [X_train, X_test, y_train, y_test]
+        tuned_model, untuned_model, X_test, y_test = train(False, split_data)
 
         untuned_prediction = untuned_model.predict(X_test)
         tuned_prediction = tuned_model.predict(X_test)
 
         mse_untuned.append(mean_squared_error(y_test, untuned_prediction))
         mse_tuned.append(mean_squared_error(y_test, tuned_prediction))
-
+        
         r2_untuned.append(r2_score(y_test, untuned_prediction))
         r2_tuned.append(r2_score(y_test, tuned_prediction))
+        
+        i += 1
 
     mse_untuned_av = pd.DataFrame(mse_untuned).mean()
     r2_untuned_av =  pd.DataFrame(r2_untuned).mean()
@@ -226,4 +236,3 @@ if __name__ == "__main__":
         test_dev()
     else:
         parser.print_help()
-
