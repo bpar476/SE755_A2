@@ -12,8 +12,7 @@ from tensorflow import keras
 from sklearn.preprocessing import Imputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import StratifiedShuffleSplit
-from sklearn.metrics import accuracy_score, precision_score
+from sklearn.model_selection import StratifiedShuffleSplit, StratifiedKFold
 
 # Argument processing
 parser = argparse.ArgumentParser(description='Machine learning algorithm for landsat data. Options are available for re-training the model, testing the model with external data or running performance analysis. Note that only one option should be supplied at a time e.g. you should not run the script with both --test and --re-train.')
@@ -27,6 +26,8 @@ parser.add_argument('--analysis', action='store_const', const=True, default=Fals
 parser.add_argument('--test-dev', action='store_const', const=True, default=False, help='Will do a train-test and print the results to the command line using the dataset from Canvas. For development purpose only')
 
 parsed_args = parser.parse_args()
+
+DATASET = '../datasets/landsat.csv'
 
 MODEL_DIR = '../model'
 MODEL_NAME = 'landsat_deep_model.h5'
@@ -66,29 +67,39 @@ def as_keras_metric(method):
 def f1_score(precision, recall):
     return  (2 * precision * recall) / (precision + recall)
 
-
-def train(save=True):
-    fileName = '../datasets/landsat.csv'
-    data = pd.read_csv(fileName, header=None)
+def preprocess(data):
     target_col = 36
-    
-    features = data.loc[:, :target_col - 1].copy()
-    target = data.loc[:, target_col].copy()
-    
-    target = target.apply(lambda x: label_dict[x])
-    
+    features = data
+    y = None
+    if target_col in data.columns:
+        last_feature = data.columns.get_loc(target_col)
+        features = data.iloc[:, :last_feature].copy()
+        y = data.loc[:, target_col].copy()
+        y = y.apply(lambda x: label_dict[x])
+
     full_pipeline = Pipeline([
             ('imputer', Imputer(strategy="median")),
             ('std_scaler', StandardScaler())
         ])
+
+    X = pd.DataFrame(data=full_pipeline.fit_transform(features))
     
-    processed_features = pd.DataFrame(data=full_pipeline.fit_transform(features))
-    sss = StratifiedShuffleSplit(n_splits=3, test_size=0.2, random_state=42)
-    for train_index, test_index in sss.split(features, target):
-                train_ind,test_ind = train_index, test_index
-                
-    X_train, X_test = processed_features.loc[train_ind], processed_features.loc[test_ind]
-    y_train, y_test = target.loc[train_ind], target.loc[test_ind]
+    return X, y
+    
+def train(save=True, split_data=None):
+    print("Training model")
+    if split_data is None:
+        data = pd.read_csv(DATASET, header=None)
+        X, y = preprocess(data)
+        sss = StratifiedShuffleSplit(n_splits=3, test_size=0.1, random_state=42)
+        for train_index, test_index in sss.split(X, y):
+                    train_ind,test_ind = train_index, test_index
+    
+        X_train, X_test = X.loc[train_ind], X.loc[test_ind]
+        y_train, y_test = y.loc[train_ind], y.loc[test_ind]
+
+    else:
+        X_train, X_test, y_train, y_test = split_data
     
     model = keras.Sequential([
             keras.layers.Dense(21, activation=tf.nn.relu),
@@ -119,18 +130,10 @@ def test_extern(test_file):
     print("Loading test data from {}".format(test_file))
     test_data = pd.read_csv(test_file, header=None)
     
-    # Feature Processing
-    features = test_data
-    if target_col in test_data.columns:
-        print("dropping target label for tests")
-        features = test_data.drop([target_col], axis=1, inplace=False)
-    full_pipeline = Pipeline([
-            ('imputer', Imputer(strategy="median")),
-            ('std_scaler', StandardScaler())
-        ])
-    
-    processed_features = pd.DataFrame(data=full_pipeline.fit_transform(features))
-    prediction = pd.DataFrame(data=model.predict(processed_features.values))
+    X, _ = preprocess(test_data)
+
+    print("Making predictions")
+    prediction = pd.DataFrame(data=model.predict(X.values))
     
     with open(os.path.join(RESULTS_DIR,RESULTS_NAME), 'w') as outfile:
         print("Printing prediction results in {}".format(outfile.name))
@@ -148,17 +151,28 @@ def test_dev():
     print("The f1 score (tuned) for all testing instances is : {:.2f}%.".format(f1_score(test_pr, test_rec)))
         
 def performance():
-    num_trials = 1
+    num_trials = 3
     acc = []
     f1 = []
     
-    # calculate performance over several trials
-    for x in range(0, num_trials):
-        print("trial {:d}".format(x))
-        model, X_test, y_test = train(False)
+    data = pd.read_csv(DATASET, header=None)
+    X, y = preprocess(data)
+    skf = StratifiedKFold(n_splits=num_trials, random_state=1)
+    skf.get_n_splits(X)
+    
+    i = 1
+    print("Running {} train and evaluate iterations".format(num_trials))
+    for train_index, test_index in skf.split(X, y):
+        print("Iteration {} out of {}".format(i, num_trials))
+        X_train, X_test, y_train, y_test = X.iloc[train_index], X.iloc[test_index], y.iloc[train_index], y.iloc[test_index]
+        split_data = [X_train, X_test, y_train, y_test]
+        model, X_test, y_test = train(False, split_data)
         loss, test_acc, test_pr, test_rec = model.evaluate(X_test, y_test)
+        
         acc.append(test_acc * 100)
         f1.append(f1_score(test_pr, test_rec))
+        
+        i += 1
         
     # Take mean of all the trials
     acc_av = pd.DataFrame(acc).mean()
@@ -193,5 +207,7 @@ if __name__ == "__main__":
         test_dev()
     else:
         parser.print_help()
+
+test_extern('../datasets/landsat.csv')
 
 
