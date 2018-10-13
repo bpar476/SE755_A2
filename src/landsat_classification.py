@@ -10,6 +10,7 @@ from sklearn.preprocessing import Imputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import StratifiedShuffleSplit, GridSearchCV
+from sklearn.feature_selection import SelectKBest
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score
 from sklearn.externals import joblib
@@ -52,7 +53,9 @@ def train(save=True):
     columns_to_keep = [16, 17, 18, 19]
     target_col = 36
 
-    features = data.loc[:, columns_to_keep].copy()
+    last_feature = data.columns.get_loc(target_col)
+    features = data.iloc[:, :last_feature].copy()
+
     target = data.loc[:, target_col].copy()
 
     full_pipeline = Pipeline([
@@ -68,13 +71,22 @@ def train(save=True):
     X_train, X_test = processed_features.loc[train_ind], processed_features.loc[test_ind]
     y_train, y_test = target.loc[train_ind], target.loc[test_ind]
 
-    model = LogisticRegression()
+    cv_pipeline = Pipeline([
+            ('feature_select', SelectKBest()),
+            ('classify', LogisticRegression())
+        ])
+
+    DIMENSIONS_TEST = [4, 12, 36]
 
     param_grid = [
-                {'penalty': ['l1', 'l2'], 'C': [ 2**x for x in range(-6,6) ]},
+                {
+                    'feature_select__k': DIMENSIONS_TEST,
+                    'classify__penalty': ['l1', 'l2'],
+                    'classify__C': [ 2**x for x in range(-6,6) ]
+                }
             ]
 
-    grid_search = GridSearchCV(model, param_grid, cv=3, scoring='accuracy',verbose=1)
+    grid_search = GridSearchCV(cv_pipeline, param_grid, cv=3, scoring='accuracy',verbose=1)
     grid_search.fit(X_train, y_train)
 
     cv_results_ = grid_search.cv_results_
