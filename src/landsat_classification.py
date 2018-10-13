@@ -9,7 +9,7 @@ import os
 from sklearn.preprocessing import Imputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import StratifiedShuffleSplit, GridSearchCV
+from sklearn.model_selection import StratifiedShuffleSplit, GridSearchCV, StratifiedKFold
 from sklearn.feature_selection import SelectKBest
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score
@@ -28,6 +28,8 @@ parser.add_argument('--test-dev', action='store_const', const=True, default=Fals
 
 parsed_args = parser.parse_args()
 
+DATASET = '../datasets/landsat.csv'
+
 MODEL_DIR = '../model'
 MODEL_NAME = 'landsat_logistic_model'
 
@@ -40,37 +42,46 @@ PERFORMANCE_NAME = 'landsat_logistic_regression.csv'
 CV_RESULTS_DIR = '../cv_results'
 CV_RESULTS_NAME = 'landsat_logistic_cv.csv'
 
+target_col = 36
+
 for directory in [MODEL_DIR, RESULTS_DIR, PERFORMANCE_DIR, CV_RESULTS_DIR]:
     if not os.path.isdir(directory):
         print("Making directory: {}".format(directory))
         os.mkdir(directory)
 
-target_col = 36
-
-def train(save=True):
-    fileName = '../datasets/landsat.csv'
-    data = pd.read_csv(fileName, header=None)
-    columns_to_keep = [16, 17, 18, 19]
+def preprocess(data):
     target_col = 36
-
-    last_feature = data.columns.get_loc(target_col)
-    features = data.iloc[:, :last_feature].copy()
-
-    target = data.loc[:, target_col].copy()
+    features = data
+    y = None
+    if target_col in data.columns:
+        last_feature = data.columns.get_loc(target_col)
+        features = data.iloc[:, :last_feature].copy()
+        y = data.loc[:, target_col].copy()
 
     full_pipeline = Pipeline([
             ('imputer', Imputer(strategy="median")),
             ('std_scaler', StandardScaler())
         ])
 
-    processed_features = pd.DataFrame(data=full_pipeline.fit_transform(features))
-    sss = StratifiedShuffleSplit(n_splits=3, test_size=0.2, random_state=42)
-    for train_index, test_index in sss.split(features, target):
-                train_ind,test_ind = train_index, test_index
+    X = pd.DataFrame(data=full_pipeline.fit_transform(features))
+    
+    return X, y
 
-    X_train, X_test = processed_features.loc[train_ind], processed_features.loc[test_ind]
-    y_train, y_test = target.loc[train_ind], target.loc[test_ind]
+def train(save=True, split_data=None):
+    print("Training model")
+    if split_data is None:
+        data = pd.read_csv(DATASET, header=None)
+        X, y = preprocess(data)
+        sss = StratifiedShuffleSplit(n_splits=3, test_size=0.1, random_state=42)
+        for train_index, test_index in sss.split(X, y):
+                    train_ind,test_ind = train_index, test_index
+    
+        X_train, X_test = X.loc[train_ind], X.loc[test_ind]
+        y_train, y_test = y.loc[train_ind], y.loc[test_ind]
 
+    else:
+        X_train, X_test, y_train, y_test = split_data
+        
     cv_pipeline = Pipeline([
             ('feature_select', SelectKBest()),
             ('classify', LogisticRegression())
@@ -82,7 +93,7 @@ def train(save=True):
                 {
                     'feature_select__k': DIMENSIONS_TEST,
                     'classify__penalty': ['l1', 'l2'],
-                    'classify__C': [ 2**x for x in range(-6,6) ]
+                    'classify__C': [ 2**x for x in range(-1,0) ]
                 }
             ]
 
@@ -114,19 +125,13 @@ def test_extern(test_file):
     print("Loading test data from {}".format(test_file))
     test_data = pd.read_csv(test_file, header=None)
 
-    # Preprocessing
-    last_feature = test_data.columns.get_loc(target_col)
-    features = test_data.iloc[:, :last_feature].copy()
+    X, _ = preprocess(test_data)
 
-    full_pipeline = Pipeline([
-            ('imputer', Imputer(strategy="median")),
-            ('std_scaler', StandardScaler())
-        ])
-    processed_features = pd.DataFrame(data=full_pipeline.fit_transform(features))
-
-    prediction = pd.DataFrame(data=model.predict(processed_features), columns=['Target'])
+    print("Making predictions")
+    prediction = pd.DataFrame(data=model.predict(X), columns=['Target'])
 
     with open(os.path.join(RESULTS_DIR,RESULTS_NAME), 'w') as outfile:
+        print("Printing prediction results in {}".format(outfile.name))
         prediction.to_csv(path_or_buf=outfile, index=False)
 
 def test_dev():
@@ -153,16 +158,24 @@ def test_dev():
     print("The f1 score (tuned) for all testing instances is : {:.2f}.".format(f1_tuned))
 
 def performance():
-    num_trials = 1
     acc_untuned = []
     acc_tuned = []
     f1_untuned = []
     f1_tuned = []
+    num_trials = 3
 
-    # calculate performance over several trials
-    for x in range(0, num_trials):
-        print("trial {:d}".format(x))
-        tuned_model, untuned_model, X_test, y_test = train(False)
+    data = pd.read_csv(DATASET, header=None)
+    X, y = preprocess(data)
+    skf = StratifiedKFold(n_splits=num_trials, random_state=1)
+    skf.get_n_splits(X)
+    
+    i = 1
+    print("Running {} train and evaluate iterations".format(num_trials))
+    for train_index, test_index in skf.split(X, y):
+        print("Iteration {} out of {}".format(i, num_trials))
+        X_train, X_test, y_train, y_test = X.iloc[train_index], X.iloc[test_index], y.iloc[train_index], y.iloc[test_index]
+        split_data = [X_train, X_test, y_train, y_test]
+        tuned_model, untuned_model, X_test, y_test = train(False, split_data)
 
         #untuned score
         T_untuned = untuned_model.predict(X_test)
@@ -173,11 +186,8 @@ def performance():
         T_tuned = tuned_model.predict(X_test)
         acc_tuned.append(100*accuracy_score(y_test, T_tuned))
         f1_tuned.append(f1_score(y_test, T_tuned,average='weighted', labels=pd.unique(pd.unique(y_test))))
-
-
-    #print(classification_report(self.y_test_matrix, T_tuned, target_names=pd.unique(pd.unique(self.target))))
-    #report = pd.DataFrame(classification_report(self.y_test_matrix, T_tuned, target_names=pd.unique(pd.unique(self.target))))
-
+        
+        i += 1
 
     # Take mean of all the trials
     acc_untuned_av = pd.DataFrame(acc_untuned).mean()
@@ -225,4 +235,7 @@ if __name__ == "__main__":
     else:
         parser.print_help()
 
+#train()
+performance()
+test_extern('../datasets/landsat.csv')
 
